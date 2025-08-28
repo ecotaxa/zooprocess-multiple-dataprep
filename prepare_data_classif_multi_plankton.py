@@ -81,28 +81,36 @@ def get_metadata(list_scans, img_folder_path):
             metadata_df = pd.concat([metadata_df, df], axis=0)
     return metadata_df
 
-def split_files(source_dir, hashtag, ratio=0.9):
+def split_files(source_dir, hashtag, ratio=[0.8,0.1,0.1]):
     import shutil
     os.makedirs(os.path.join(source_dir, "train", hashtag), exist_ok=True)
     os.makedirs(os.path.join(source_dir, "test", hashtag), exist_ok=True)
+    os.makedirs(os.path.join(source_dir, "valid", hashtag), exist_ok=True)
     files = os.listdir(os.path.join(source_dir,hashtag))
     np.random.shuffle(files)
-    split_index = int(len(files) * ratio)
-    train_files = files[:split_index]
-    test_files = files[split_index:]
+    split_index_1 = int(len(files) * ratio[1])
+    split_index_2 = int(len(files) * ratio[2]) + split_index_1
+    test_files = files[:split_index_1]
+    valid_files = files[split_index_1:split_index_2]
+    train_files = files[split_index_2:]
     for f in train_files:
         shutil.move(os.path.join(source_dir, hashtag, f), os.path.join(source_dir, "train", hashtag, f))
 
     for f in test_files:
         shutil.move(os.path.join(source_dir, hashtag, f), os.path.join(source_dir, "test", hashtag, f))
-    print(f"photos {hashtag} split into train and test sets whith a test ratio of {ratio}.")
+
+    for f in valid_files:
+        shutil.move(os.path.join(source_dir, hashtag, f), os.path.join(source_dir, "valid", hashtag, f))
+
+    print(f"photos {hashtag} split into train,test and valid sets whith ratios {ratio}.")
 
     shutil.rmtree(os.path.join(source_dir,hashtag))
 
     return
 
 
-def prepare_data_classif(sep_img_folder_path,save_folder,no_sep_img_folder_path, limit_per_scan=20, nb_max_multi=0,nb_max_solo=0, ratio=0.9):
+def prepare_data_classif(sep_img_folder_path,save_folder,no_sep_img_folder_path, 
+                         limit_per_scan=20, nb_max_multi=0,nb_max_solo=0, ratio=[0.8,0.1,0.1]):
     count = 1
     count_img_total = 0
     list_scans_sep = get_list_scan(sep_img_folder_path)
@@ -113,6 +121,7 @@ def prepare_data_classif(sep_img_folder_path,save_folder,no_sep_img_folder_path,
     os.makedirs(save_folder_solo, exist_ok=True)
     os.makedirs(os.path.join(save_folder, "train"), exist_ok=True)
     os.makedirs(os.path.join(save_folder, "test"), exist_ok=True)
+    os.makedirs(os.path.join(save_folder, "valid"), exist_ok=True)
 
 
     #Get metadat for images with separation
@@ -126,8 +135,6 @@ def prepare_data_classif(sep_img_folder_path,save_folder,no_sep_img_folder_path,
 
     no_sep_metadata_df = get_metadata(list_scans_no_sep,no_sep_img_folder_path)
 
-
-    mask_count_total = 0
 
     for i, scan_id in enumerate(list_scans_sep):
         count_per_scan = 0
@@ -298,7 +305,7 @@ if __name__ == "__main__":
                         help="number max of images of solo plankton to keep in the dataset")
     parser.add_argument("--max_nb_multi", action="store", type=int, dest="max_nb_multi", default=0,
                         help="number max of images of multiple plankton to keep in the dataset")
-    parser.add_argument("--ratio", action="store", type=float, dest="ratio", default=0.9, help="ratio (for train) to split train/test")
+    parser.add_argument("--ratio", action="store", type=list, dest="ratio", default=[0.1,0.1,0.9], help="ratio (for train) to split train/test")
 
     args = parser.parse_args()
     save_folder = args.save_folder
@@ -330,7 +337,11 @@ if __name__ == "__main__":
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
 
-    prepare_data_classif(sep_img_folder_path,save_folder,no_sep_img_folder_path, nb_max_multi=25, nb_max_solo=25)
+    
+
+    prepare_data_classif(sep_img_folder_path, save_folder, no_sep_img_folder_path, 
+                         nb_max_multi=args.max_nb_multi, nb_max_solo=args.max_nb_solo, 
+                         ratio=args.ratio, limit_per_scan=args.limit_per_scan)
 
 
     print(f"Data preparation completed. Check the save folder: {save_folder}")
